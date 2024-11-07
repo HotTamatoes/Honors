@@ -1,0 +1,15 @@
+.vscode/settings.json
+amdMats/
+build/
+convertedMats/
+dFactors/
+lFactors/
+dissectMats/
+hDissectMats/
+helmholtzMats/
+helmholtzMats2/
+rcmMats/
+include/.DenseMatrix.hpp.swo
+src/tester.cpp
+src/tester2.cpp
+src/tester3.cpp

@@ -70,5 +70,3 @@ bool isSPD(const CSCMatrix& cmat)
   }
   return passesFullSPDTest(); //cmat);
 }
-
-

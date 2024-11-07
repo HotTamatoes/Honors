@@ -6,7 +6,9 @@
 
 using namespace std;
 
-
+// Input: Full CSCMatrix
+// Output: Lower triangle of CSCMatrix
+// separating this allows quick access to diagonal
 CSCMatrix lowerDiagonal(const CSCMatrix& cmat)
 {
   CSCMatrix lowerDiag;
@@ -26,6 +28,9 @@ CSCMatrix lowerDiagonal(const CSCMatrix& cmat)
   return lowerDiag;
 }
 
+// Input: Symbolic Analysis Sets
+// Output: Inverted Symbolic Analysis Sets
+// Used to figure out with nodes on the assembly tree are leaves (not dependent on another frontal factorization)
 vector<Set> findDependent(const vector<Set>& scriptL)
 {
   int dim = scriptL.size();
@@ -36,10 +41,10 @@ vector<Set> findDependent(const vector<Set>& scriptL)
   return scriptQ;
 }
 
+// Inserts the next column into the l factor the algorithm is building column by column (the workhorse of the algorithm)
 void insertColumnToCSC(const int col, const Set& scriptL, 
   const CSCMatrix& mmat, CSCMatrix& lmat, double alpha)
 {
-//  cout << "Column: " << col << " with scriptL " << scriptL << endl;
   int dim = lmat.p.size() - 1;
   int nNonZero = lmat.p[dim];
   for (int i = dim; i < col + 1; i++) { // resize lmat as needed
@@ -51,24 +56,19 @@ void insertColumnToCSC(const int col, const Set& scriptL,
   int tooFar = mmat.p[col+1];
   double diag = mmat.a[mIndex];
   for (auto it = scriptL.begin(); it != scriptL.end(); ++it, ++mIndex) {
-//    cout << "mmat.i at mIndex is: " << mmat.i[mIndex] << endl;
     if (mIndex >= tooFar) {
-//      cout << "break" << endl;
       break;
     }
-    if (mmat.i[mIndex] != *it) {
-//      cout << "continue" << endl;
+    if (mmat.i[mIndex] != *it){
       --mIndex;
       continue;
     }
     double updateVal = mmat.a[mIndex] / diag;
-//    cout << "updateVal: " << updateVal << endl;
     if (abs(updateVal) > alpha) {
-//      cout << "added" << endl;
       lmat.i.insert(lmat.i.begin() + lStart + lCtr, *it);
       lmat.a.insert(lmat.a.begin() + lStart + lCtr, updateVal);
       lCtr++;
-    } 
+    }
   }
   dim = lmat.p.size() - 1;
   for (int i = col + 1; i < dim + 1; i++) {
@@ -76,6 +76,7 @@ void insertColumnToCSC(const int col, const Set& scriptL,
   }
 }
 
+// inserts the next diagonal value into the d vector
 void insertDValueToVec(const int col, const double d, vector<double>& dvec)
 {
   int dim = dvec.size();
@@ -84,11 +85,14 @@ void insertDValueToVec(const int col, const double d, vector<double>& dvec)
   dvec[col] = d;
 }
 
+// Updates the matrix based on the factors from the previous frontal matrix
+// modifies if the matrix had a value there before
+// inserts if the matrix had a 0 there before
 void modifyOrInsert(const int row, const int col, CSCMatrix& mmat, 
   const double delta)
 {
   int idx = mmat.p[col];
-  while (mmat.i[idx] < row && idx != mmat.p[col + 1]) {
+  while (mmat.i[idx] < row && idx != mmat.p[col + 1]){
     idx++;
   }
   if (mmat.i[idx] > row || idx == mmat.p[col + 1]) {
@@ -102,6 +106,8 @@ void modifyOrInsert(const int row, const int col, CSCMatrix& mmat,
   }
 }
 
+// Updates the matrix based on the factors from the previous frontal matrix
+// does (M - frontal LDL) one spot at a time
 void modifyMMatrixByLDL(const int col, CSCMatrix& mmat, const CSCMatrix& lmat, 
     const double diag)
 {
@@ -113,6 +119,7 @@ void modifyMMatrixByLDL(const int col, CSCMatrix& mmat, const CSCMatrix& lmat,
   }
 }
 
+// Performs a single frontal matrix factorization
 void singlefrontal(const int col, const Set& scriptL, CSCMatrix& mmat, 
   CSCMatrix& lmat, vector<double>& dvec, double alpha)
 {
@@ -122,6 +129,9 @@ void singlefrontal(const int col, const Set& scriptL, CSCMatrix& mmat,
   modifyMMatrixByLDL(col, mmat, lmat, diag);
 }
 
+// Erases the column as a dependent from the dependency list
+(makes new leaves the algorithm can choose from)
+// See findDependent
 void eraseColumnFromSet(const int col, vector<Set>& scriptQ)
 {
   int dim = scriptQ.size();
@@ -129,16 +139,18 @@ void eraseColumnFromSet(const int col, vector<Set>& scriptQ)
     scriptQ[i].erase(col);
 }
 
+//  Picks the next node to perform frontal factorization on using the dependency list
 void singleNode(const vector<Set>& scriptL, vector<Set>& scriptQ,
   CSCMatrix& mmat, CSCMatrix& lmat, vector<double>& dvec, double alpha)
 {
   int col = 0;
-  while (scriptQ[col].size() != 1)
+  while (scriptQ[col].size() != 1) // column node is not a leaf
     col++;
   singlefrontal(col, scriptL[col], mmat, lmat, dvec, alpha);
   eraseColumnFromSet(col, scriptQ);
 }
 
+// Performs an incomplete LDL factorization given symbolic analysis and the matrix
 tuple<CSCMatrix, vector<double>> incompleteLDL(const vector<Set>& scriptL, 
   const CSCMatrix& cmat, double alpha)
 {
@@ -148,13 +160,7 @@ tuple<CSCMatrix, vector<double>> incompleteLDL(const vector<Set>& scriptL,
   vector<double> dvec;
   vector<Set> scriptQ = findDependent(scriptL);
   for (int nodeCtr = 0; nodeCtr < dim; nodeCtr++) {
-//    cout << "lmat (before): " << endl << lmat << endl;
-//    cout << "dvec (before): " << endl << dvec << endl;
-//    cout << "mmat (before): " << endl << mmat << endl;
     singleNode(scriptL, scriptQ, mmat, lmat, dvec, alpha);
-//    cout << "lmat (after): " << endl << lmat << endl;
-//    cout << "dvec (after): " << endl << dvec << endl;
-//    cout << "mmat (after): " << endl << mmat << endl;
   }
   return make_tuple(lmat, dvec);
 }
